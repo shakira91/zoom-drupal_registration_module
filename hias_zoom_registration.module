@@ -1,0 +1,55 @@
+<?php 
+
+
+function hias_zoom_registration_form_alter(&$form, $form_state, $form_id) { 
+if (!user_is_logged_in() && !empty($form['#node']->nid) && $form['#node']->type == 'event') {
+       $form['#prefix'] = '<div id="hias-zoom-registration-form">';
+       $form['actions']['submit']['#ajax'] = array(
+        'callback' => 'hias_zoom_registration_callback',
+        'wrapper' => 'hias-zoom-registration-form',
+        'method' => 'replace',
+      );
+      $form['#suffix'] = '</div>'; 
+  }
+}
+
+
+function hias_zoom_registration_callback(&$form, $form_state) { 
+
+    $errors = form_get_errors();
+    if($errors) {
+      $form_state['rebuild'] = FALSE;
+      return $form;
+    } else {
+      $url =  $form['#node']->field_webhook_url['und'][0]['value'];
+      $fields = array(
+        'Fname' => $form_state['input']['submitted']['first_name'],
+        'Lname' => $form_state['input']['submitted']['last_name'],
+        'Email' => $form_state['input']['submitted']['email'],
+        'Zip' => $form_state['input']['submitted']['zip'],
+        'Org' => $form_state['input']['submitted']['organization'],
+      );
+      foreach($fields as $key=>$value) { 
+        $fields_string .= $key.'='.$value.'&'; 
+      }
+
+      $curl = curl_init();
+
+      //set the url, number of POST vars, POST data
+      curl_setopt($curl,CURLOPT_URL, $url);
+      curl_setopt($curl,CURLOPT_POST, count($fields));
+      curl_setopt($curl,CURLOPT_POSTFIELDS, $fields_string);
+      curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+
+      //execute
+      $result = curl_exec($curl);
+
+      $curl_result = json_decode($result, true);
+
+      return array('#markup' => '<br><p id="hias-zoom-registration-submitted"><strong>' . t('Thank you for registering for ' . $form['#node']->title) . '.</strong></p>');
+
+      //close connection
+      curl_close($curl); 
+
+    }
+}
